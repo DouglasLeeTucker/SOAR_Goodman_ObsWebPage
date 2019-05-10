@@ -3,7 +3,7 @@
 #   creates finding charts from a list of FITS images
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
-def createFindingChartsFromDECamFITSImage(image_file, target_radeg, target_decdeg, target_id, target_name, outputDir):
+def createFindingChartsFromDECamFITSImage(image_file, fitsType, target_radeg, target_decdeg, target_id, target_name, outputDir):
     
     import numpy as np
     import pandas as pd
@@ -17,6 +17,8 @@ def createFindingChartsFromDECamFITSImage(image_file, target_radeg, target_decde
     from matplotlib import path
     from matplotlib.patches import Arrow
     import matplotlib.pyplot as plt
+
+    import matplotlib.transforms as mtransforms
 
     from astropy.io import fits
     import astropy.coordinates as coord
@@ -37,10 +39,25 @@ def createFindingChartsFromDECamFITSImage(image_file, target_radeg, target_decde
 
     from astropy.nddata import Cutout2D
 
-    # Read in image...
-    image_data = fits.getdata(image_file, ext=1)
-    image_hdr = fits.getheader(image_file, ext=1)
     
+    # Read in image...
+    if fitsType == "DECam":
+        # DECam FITS image...
+        image_data = fits.getdata(image_file, ext=1)
+        image_hdr = fits.getheader(image_file, ext=1)
+        arcsec_per_pixel = 0.263
+    elif fitsType == "SkyView":
+        # Skyview FITS image
+        image_data = fits.getdata(image_file)
+        image_hdr = fits.getheader(image_file)
+        arcsec_per_pixel = 3600.*abs(image_hdr['CDELT1'])
+    else:
+        # Guess...
+        image_data = fits.getdata(image_file)
+        image_hdr = fits.getheader(image_file)
+        arcsec_per_pixel = 3600.*abs(image_hdr['CDELT1'])
+
+
     # We want zscale scaling...
     interval = ZScaleInterval()
     vlimits = interval.get_limits(image_data)
@@ -52,7 +69,7 @@ def createFindingChartsFromDECamFITSImage(image_file, target_radeg, target_decde
     position = SkyCoord(target_radeg,target_decdeg, unit="deg", frame='icrs')
     
     # The arrow length for the North and East direction arrows...
-    arrowLength = 60./0.263  # 1 arcmin arrow length (DECam pixel scale:  0.263arcsec/pixel)
+    arrowLength = 60./arcsec_per_pixel  # 1 arcmin arrow length
     
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
     # CCD size finding chart:
@@ -68,30 +85,59 @@ def createFindingChartsFromDECamFITSImage(image_file, target_radeg, target_decde
     ax=plt.subplot(1,1,1)
     plt.axis('off')
     
-    # To get image to plot at the preferred orientiation (N at top, E at the right), 
-    #  we transpose the image_data and set the origin of the plot as "upper"...
-    im = ax.imshow(image_data.T, cmap='gray', origin='upper', norm=norm)
+    # DECam FITS image...
+    if fitsType == "DECam":
+
+        # To get image to plot at the preferred orientiation (N at top, E at the right)...
+        #  we transpose the image_data and set the origin of the plot as "upper"...
+        im = ax.imshow(image_data.T, cmap='gray', origin='upper', norm=norm)
+
+        # Circle the target (don't forget to transpose the x,y coordinates!)...
+        ax.scatter(y,x, s=30, edgecolor='blue', facecolor='none')
+
+        # Add title...
+        title = """ObjID: %d  \n(Name: %s)""" % (target_id, target_name)
+        plt.title(title, color='blue', fontsize=10) 
+
+        # Add "compass rose"...
+        a =  Arrow(200., 100., 0., arrowLength, edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(200,100,'N',color='black')
+
+        a =  Arrow(200., 100.+arrowLength, arrowLength, 0., edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(200+arrowLength,100+arrowLength,'E',color='black')
+        plt.text(50,25+0.5*arrowLength,'1.0\'',color='black',rotation=90)
+
+        # Include color bar at the bottom of the plot...
+        #fig.colorbar(im, orientation="horizontal")
     
-    # Circle the target (don't forget to transpose the x,y coordinates!)...
-    ax.scatter(y,x, s=30, edgecolor='blue', facecolor='none')
+    # Skyview FITS image
+    elif fitsType == "SkyView":
 
-    # Add title...
-    title = """ObjID: %d  \n(Name: %s)""" % (target_id, target_name)
-    plt.title(title, color='blue', fontsize=10) 
+        im = ax.imshow(image_data, cmap='gray', origin='lower', norm=norm)        
 
-    # Add "compass rose"...
-    a =  Arrow(200., 100., 0., arrowLength, edgecolor='black', facecolor='none')
-    ax.add_patch(a)
-    plt.text(200,100,'N',color='black')
+        # Circle the target...
+        ax.scatter(x,y, s=30, edgecolor='blue', facecolor='none')
 
-    a =  Arrow(200., 100.+arrowLength, arrowLength, 0., edgecolor='black', facecolor='none')
-    ax.add_patch(a)
-    plt.text(200+arrowLength,100+arrowLength,'E',color='black')
-    plt.text(50,25+0.5*arrowLength,'1.0\'',color='black',rotation=90)
+        # Add title...
+        title = """ObjID: %d  \n(Name: %s)""" % (target_id, target_name)
+        plt.title(title, color='blue', fontsize=10) 
 
-    # Include color bar at the bottom of the plot...
-    #fig.colorbar(im, orientation="horizontal")
+        # Add "compass rose"...
+        a =  Arrow(200., 100., 0., arrowLength, edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(200,100,'N',color='black')
+
+        a =  Arrow(200., 100., arrowLength, 0., edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(200+arrowLength,100,'W',color='black')
+        plt.text(50,25+0.5*arrowLength,'1.0\'',color='black',rotation=90)
+
+        # Include color bar at the bottom of the plot...
+        #fig.colorbar(im, orientation="horizontal")
     
+
     # Save figure
     outputFile = """objid_%d.%s.ccd_image.png""" % (target_id, target_name)
     outputFile = os.path.join(outputDir,outputFile)
@@ -122,31 +168,60 @@ def createFindingChartsFromDECamFITSImage(image_file, target_radeg, target_decde
     ax=plt.subplot(1,1,1)
     plt.axis('off')
 
-    # To get image to plot at the preferred orientiation (N at top, E at the right), 
-    #  we transpose the cutout.data and set the origin of the plot as "upper"...
-    ax.imshow(cutout.data.T, cmap='gray', origin='upper', norm=norm)
+    # DECam FITS image...
+    if fitsType == "DECam":
 
-    # Circle the target (don't forget to transpose the x,y coordinates!)...
-    ax.scatter(y,x, s=30, edgecolor='blue', facecolor='none')
+        # To get image to plot at the preferred orientiation (N at top, E at the right)...
+        ax.imshow(cutout.data.T, cmap='gray', origin='upper', norm=norm)
+
+        # Circle the target (don't forget to transpose the x,y coordinates!)...
+        ax.scatter(y,x, s=30, edgecolor='blue', facecolor='none')
+
+        # Add title...
+        text1 = """ObjID: %d""" % (target_id)
+        text2 = """(Name:  %s)""" % (target_name)
+        plt.text(0.5*size.value[1]*60./arcsec_per_pixel,50,text1,color='blue',fontsize=10)
+        plt.text(0.5*size.value[1]*60./arcsec_per_pixel,50+0.05*size.value[0]*60./arcsec_per_pixel,text2,color='blue',fontsize=10)
+
+        # Add "compass rose"...
+        a =  Arrow(50., 50., 0., arrowLength, edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(50,50,'N',color='black')
+
+        a =  Arrow(50., 50.+arrowLength, arrowLength, 0., edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(50+arrowLength,50+arrowLength,'E',color='black')
+        plt.text(-10,15+0.5*arrowLength,'1.0\'',color='black',rotation=90)
     
-    # Add title...
-    text1 = """ObjID: %d""" % (target_id)
-    text2 = """(Name:  %s)""" % (target_name)
-    plt.text(0.5*size.value[1]*60./0.263,50,text1,color='blue',fontsize=10)
-    plt.text(0.5*size.value[1]*60./0.263,50+0.05*size.value[0]*60./0.263,text2,color='blue',fontsize=10)
+        # Include color bar at the side of the plot...
+        #fig.colorbar(im)
 
-    # Add "compass rose"...
-    a =  Arrow(50., 50., 0., arrowLength, edgecolor='black', facecolor='none')
-    ax.add_patch(a)
-    plt.text(50,50,'N',color='black')
+    # Skyview FITS image
+    elif fitsType == "SkyView":
 
-    a =  Arrow(50., 50.+arrowLength, arrowLength, 0., edgecolor='black', facecolor='none')
-    ax.add_patch(a)
-    plt.text(50+arrowLength,50+arrowLength,'E',color='black')
-    plt.text(-10,15+0.5*arrowLength,'1.0\'',color='black',rotation=90)
+        im = ax.imshow(cutout.data, cmap='gray', origin='lower', norm=norm)
 
-    # Include color bar at the side of the plot...
-    #fig.colorbar(im)
+        # Circle the target...
+        ax.scatter(x,y, s=30, edgecolor='blue', facecolor='none')
+
+        # Add title...
+        text1 = """ObjID: %d""" % (target_id)
+        text2 = """(Name:  %s)""" % (target_name)
+        plt.text(0.5*size.value[1]*60./arcsec_per_pixel,50,text1,color='blue',fontsize=10)
+        plt.text(0.5*size.value[1]*60./arcsec_per_pixel,50+0.05*size.value[0]*60./arcsec_per_pixel,text2,color='blue',fontsize=10)
+
+        # Add "compass rose"...
+        a =  Arrow(50., 50., 0., arrowLength, edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(50,50+arrowLength,'N',color='black')
+
+        a =  Arrow(50., 50., arrowLength, 0., edgecolor='black', facecolor='none')
+        ax.add_patch(a)
+        plt.text(50+arrowLength,50,'W',color='black')
+        plt.text(30,60+0.5*arrowLength,'1.0\'',color='black',rotation=90)
+    
+        # Include color bar at the side of the plot...
+        #fig.colorbar(im)
     
     # Save figure
     outputFile = """objid_%d.%s.5x5arcmin.png""" % (target_id, target_name)

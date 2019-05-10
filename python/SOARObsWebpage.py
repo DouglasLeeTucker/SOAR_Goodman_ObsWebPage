@@ -494,7 +494,7 @@ fout.write("""<UL>\n""")
 fout.write("""<LI> <A HREF=./"""+priTargetName+"""targets.obs_strategy.html> Formatted for Observing Strategy</A> (includes Estimated Exposure Times, Finding Charts, Airmass Tables, etc.)\n""")
 fout.write("""<LI> <A HREF=./"""+priTargetName+"""targets.goodman_targetlist.txt> Formatted for the SOAR-4m TCS</A>\n""")
 fout.write("""</UL>\n""")
-fout.write("""<H3> <H3>Mosaic of Target Images (from DECam): </H3>\n""")
+fout.write("""<H3> <H3>Mosaic of Target Images (from DECam or SkyView): </H3>\n""")
 fout.write("""\n""")
 #fout.write("""<table border cellspacing=0 cellpadding=0>\n""")
 #fout.write("""<table border\n""")
@@ -566,6 +566,9 @@ for index, row in df_gw.iterrows():
     fitsFile_input_gw = row['FITSimage']
     fitsFile_gw = os.path.basename(fitsFile_input_gw)
 
+    # New!:
+    fitsType = row['FITStype']
+    
     ra_gw_hms = str(row['raHMS'])
     dec_gw_dms = str(row['decDMS'])
 
@@ -578,7 +581,7 @@ for index, row in df_gw.iterrows():
     dec_gw_dd = str(dec_gw_dms_list[0])
     dec_gw_mm = str(dec_gw_dms_list[1])
     dec_gw_ss = str(dec_gw_dms_list[2])
-
+    
     ra_gw = row['radeg']
     ra_nowrap_gw = row['radeg_nowrap']
     dec_gw = row['decdeg']
@@ -593,21 +596,32 @@ for index, row in df_gw.iterrows():
 
     #comments = """<A HREF=%s>local FITS file</A>, <A HREF=%s>ds9 region file</A>   %s""" % (fitsFile, regFile, comments)
 
-    # Create png finding chart images...
-    imageNameCCD,imageName5x5 = cfc.createFindingChartsFromDECamFITSImage(fitsFile_input_gw,ra_nowrap_gw, dec_gw, idnum, name_gw, priTargetsDataDir)
+    # Temporary fix to deal with Skyview FITS images...
+    if True:
+        # Create png finding chart images...
+        imageNameCCD,imageName5x5 = cfc.createFindingChartsFromDECamFITSImage(fitsFile_input_gw, fitsType, ra_nowrap_gw, dec_gw, idnum, name_gw, priTargetsDataDir)
         
-    # Copy original FITS image to priTargetsDataDir
-    copy2(fitsFile_input_gw,priTargetsDataDir)
-    fitsFile_gw = os.path.basename(fitsFile_input_gw)
+        # Copy original FITS image to priTargetsDataDir
+        copy2(fitsFile_input_gw,priTargetsDataDir)
+        fitsFile_gw = os.path.basename(fitsFile_input_gw)
     
-    # Add entry to combined ds9 region file...
-    freg_out.write("""circle(%f,%f,10.0") # color=blue text={%s}\n""" % (ra_nowrap_gw, dec_gw, name_gw))
+        # Add entry to combined ds9 region file...
+        freg_out.write("""circle(%f,%f,10.0") # color=blue text={%s}\n""" % (ra_nowrap_gw, dec_gw, name_gw))
 
-    # Extract the filename for imageNameCCD and imageName5x5 from their pathnames...
-    imageNameCCD = os.path.basename(imageNameCCD)
-    imageName5x5 = os.path.basename(imageName5x5)
+        # Extract the filename for imageNameCCD and imageName5x5 from their pathnames...
+        imageNameCCD = os.path.basename(imageNameCCD)
+        imageName5x5 = os.path.basename(imageName5x5)
+
+    else:
+        fitsFile_gw = 'XXX'
+        imageNameCCD = 'YYY'
+        imageName5x5 = 'ZZZ'
+
+
+    #outputLine2 = '%5d  %-26s   %-13s %-14s    %5.2f   %4d (=3x%4d)      DECam cutout (<A HREF=./data/%s>png</A>), DECam CCD image (<A HREF=./data/%s>png</A>,<A HREF=./data/%s>FITS</A>), <A HREF=./data/%s>ds9 reg file</A>, <A HREF=http://skyview.gsfc.nasa.gov/cgi-bin/runquery.pl?Survey=DSS2+Red&GRID=J2000&gridlabels=1&position=%2s+%2s+%4s,%3s+%2s+%2s&Size=0.166667&Pixels=600&Return>SkyView</A>       <A HREF=http://www.briancasey.org/artifacts/astro/airmass.cgi?observatory=t&obslong=&obslat=&actual=&effective=&site=&zone=&zonename=&zoneabbrev=&daylight=1&year=%s&month=%s&day=%s&starname=%s&rightasc=%2s+%2s+%4s&declin=%3s+%2s+%2s&epoch=2000&altitude=-18&command=display>Airmass Table</A>    %s' %                   (idnum, name_gw, ra_gw_hms, dec_gw_dms,                    mag_gw, int(totExpTime), int(expTime),                    imageName5x5, imageNameCCD, fitsFile_gw, regFile,                    ra_gw_hh, ra_gw_mm, ra_gw_ss,                    dec_gw_dd, dec_gw_mm, dec_gw_ss,                    YYYY, MM, DD, name_gw, ra_gw_hh, ra_gw_mm, ra_gw_ss,                    dec_gw_dd, dec_gw_mm, dec_gw_ss,                    comments)
+
+    outputLine2 = '%5d  %-26s   %-13s %-14s    %5.2f   %4d (=3x%4d)      DECam cutout (<A HREF=./data/%s>png</A>), DECam CCD image (<A HREF=./data/%s>png</A>,<A HREF=./data/%s>FITS</A>), <A HREF=./data/%s>ds9 reg file</A>, <A HREF=http://skyview.gsfc.nasa.gov/cgi-bin/runquery.pl?Survey=DSS2+Red&GRID=J2000&gridlabels=1&position=%s+%s+%s,%s+%s+%s&Size=0.166667&Pixels=600&Return>SkyView</A>       <A HREF=http://www.briancasey.org/artifacts/astro/airmass.cgi?observatory=t&obslong=&obslat=&actual=&effective=&site=&zone=&zonename=&zoneabbrev=&daylight=1&year=%s&month=%s&day=%s&starname=%s&rightasc=%s+%s+%s&declin=%s+%s+%s&epoch=2000&altitude=-18&command=display>Airmass Table</A>    %s' %                   (idnum, name_gw, ra_gw_hms, dec_gw_dms,                    mag_gw, int(totExpTime), int(expTime),                    imageName5x5, imageNameCCD, fitsFile_gw, regFile,                    ra_gw_hh, ra_gw_mm, ra_gw_ss,                    dec_gw_dd, dec_gw_mm, dec_gw_ss,                    YYYY, MM, DD, name_gw, ra_gw_hh, ra_gw_mm, ra_gw_ss,                    dec_gw_dd, dec_gw_mm, dec_gw_ss,                    comments)
     
-    outputLine2 = '%5d  %-26s   %-13s %-14s    %5.2f   %4d (=3x%4d)      DECam cutout (<A HREF=./data/%s>png</A>), DECam CCD image (<A HREF=./data/%s>png</A>,<A HREF=./data/%s>FITS</A>), <A HREF=./data/%s>ds9 reg file</A>, <A HREF=http://skyview.gsfc.nasa.gov/cgi-bin/runquery.pl?Survey=DSS2+Red&GRID=J2000&gridlabels=1&position=%2s+%2s+%4s,%3s+%2s+%2s&Size=0.166667&Pixels=600&Return>SkyView</A>       <A HREF=http://www.briancasey.org/artifacts/astro/airmass.cgi?observatory=t&obslong=&obslat=&actual=&effective=&site=&zone=&zonename=&zoneabbrev=&daylight=1&year=%s&month=%s&day=%s&starname=%s&rightasc=%2s+%2s+%4s&declin=%3s+%2s+%2s&epoch=2000&altitude=-18&command=display>Airmass Table</A>    %s' %                   (idnum, name_gw, ra_gw_hms, dec_gw_dms,                    mag_gw, int(totExpTime), int(expTime),                    imageName5x5, imageNameCCD, fitsFile_gw, regFile,                    ra_gw_hh, ra_gw_mm, ra_gw_ss,                    dec_gw_dd, dec_gw_mm, dec_gw_ss,                    YYYY, MM, DD, name_gw, ra_gw_hh, ra_gw_mm, ra_gw_ss,                    dec_gw_dd, dec_gw_mm, dec_gw_ss,                    comments)
 
     outputLine2 = outputLine2+'\n\n'
     fout2.write(outputLine2)
@@ -648,7 +662,8 @@ for index, row in df_gw.iterrows():
     fout.write("""  <td>%s</td>\n""" % (dec_gw_dms))
     fout.write("""  <td>%5.2f (%s-band)</td>\n""" % (mag_gw, band_gw))
     fout.write("""  <td>%d (=3x %d)</td>\n""" % (int(totExpTime), int(expTime) ))
-    fout.write("""  <td><a href=http://www.briancasey.org/artifacts/astro/airmass.cgi?observatory=t&obslong=&obslat=&actual=&effective=&site=&zone=&zonename=&zoneabbrev=&daylight=1&year=%s&month=%s&day=%s&starname=%s&rightasc=%2s+%2s+%4s&declin=%3s+%2s+%2s&epoch=2000&altitude=-18&command=display>%s-%s-%s</a>\n""" % (YYYY, MM, DD, name_gw, ra_gw_hh, ra_gw_mm, ra_gw_ss, dec_gw_dd, dec_gw_mm, dec_gw_ss, YYYY, MM, DD))
+    #fout.write("""  <td><a href=http://www.briancasey.org/artifacts/astro/airmass.cgi?observatory=t&obslong=&obslat=&actual=&effective=&site=&zone=&zonename=&zoneabbrev=&daylight=1&year=%s&month=%s&day=%s&starname=%s&rightasc=%2s+%2s+%4s&declin=%3s+%2s+%2s&epoch=2000&altitude=-18&command=display>%s-%s-%s</a>\n""" % (YYYY, MM, DD, name_gw, ra_gw_hh, ra_gw_mm, ra_gw_ss, dec_gw_dd, dec_gw_mm, dec_gw_ss, YYYY, MM, DD))
+    fout.write("""  <td><a href=http://www.briancasey.org/artifacts/astro/airmass.cgi?observatory=t&obslong=&obslat=&actual=&effective=&site=&zone=&zonename=&zoneabbrev=&daylight=1&year=%s&month=%s&day=%s&starname=%s&rightasc=%s+%s+%s&declin=%s+%s+%s&epoch=2000&altitude=-18&command=display>%s-%s-%s</a>\n""" % (YYYY, MM, DD, name_gw, ra_gw_hh, ra_gw_mm, ra_gw_ss, dec_gw_dd, dec_gw_mm, dec_gw_ss, YYYY, MM, DD))
     fout.write("""  </tr>\n""")
     fout.write("""</table>\n""")
     fout.write("""</center>\n""")
@@ -666,7 +681,8 @@ for index, row in df_gw.iterrows():
     fout.write("""  <td><a href=data/%s>local png</a>,\n""" % (imageNameCCD))
     fout.write("""      <a href=data/%s>local FITS</a></td>\n""" % (fitsFile_gw))
     fout.write("""  <td><a href=data/%s>local reg</a>\n""" % (regFile))
-    fout.write("""  <td><a href=http://skyview.gsfc.nasa.gov/cgi-bin/runquery.pl?Survey=DSS2+Red&GRID=J2000&gridlabels=1&position=%2s+%2s+%4s,%3s+%2s+%2s&Size=0.166667&Pixels=600&Return>SkyView</a>\n""" % (ra_gw_hh, ra_gw_mm, ra_gw_ss, dec_gw_dd, dec_gw_mm, dec_gw_ss) )
+    #fout.write("""  <td><a href=http://skyview.gsfc.nasa.gov/cgi-bin/runquery.pl?Survey=DSS2+Red&GRID=J2000&gridlabels=1&position=%2s+%2s+%4s,%3s+%2s+%2s&Size=0.166667&Pixels=600&Return>SkyView</a>\n""" % (ra_gw_hh, ra_gw_mm, ra_gw_ss, dec_gw_dd, dec_gw_mm, dec_gw_ss) )
+    fout.write("""  <td><a href=http://skyview.gsfc.nasa.gov/cgi-bin/runquery.pl?Survey=DSS2+Red&GRID=J2000&gridlabels=1&position=%s+%s+%s,%s+%s+%s&Size=0.166667&Pixels=600&Return>SkyView</a>\n""" % (ra_gw_hh, ra_gw_mm, ra_gw_ss, dec_gw_dd, dec_gw_mm, dec_gw_ss) )
     fout.write("""  <P>\n""")
     fout.write("""  </tr>\n""")
     fout.write("""</table>\n""")
